@@ -212,14 +212,13 @@ def train():
     teacher_predictor = SAM2ImagePredictor(teacher_model)
 
     # Student setup
-    
-
+    student_model = PicoSAM2().to(device)
     optimizer = torch.optim.AdamW(student_model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step: min(1.0, step / 1000))
 
     # Dataset and loaders
     dataset = PicoSAM2Dataset(IMG_ROOT, ANN_FILE, IMAGE_SIZE)
-    subset_fraction = 0.01
+    subset_fraction = 0.0005
     subset_size = int(len(dataset) * subset_fraction)
     val_size = max(1, int(subset_size * 0.1))
     train_size = subset_size - val_size
@@ -232,11 +231,10 @@ def train():
     val_indices = indices[train_size:train_size + val_size]
     train_set = Subset(dataset, train_indices)
     val_set = Subset(dataset, val_indices)
-    student_model = PicoSAM2().to(device)
 
     student_model.train()
     qconfig = aoq.get_default_qat_qconfig('fbgemm')  # similar to old API
-    aoq.prepare_qat(student_model, qconfig=qconfig, inplace=True)
+    aoq.prepare_qat(student_model, inplace=True)
     print("Student model is QAT-ready.")
     #train_set, val_set = random_split(dataset, [train_size, val_size])
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)

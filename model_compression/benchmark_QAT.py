@@ -99,28 +99,10 @@ if __name__ == "__main__":
     distilled.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1.pt"), map_location=DEVICE)); distilled.eval() # Added: , map_location=DEVICE
     quant = PicoSAM2().to("cpu")
     quant.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1.pt"), map_location=DEVICE)); quant.eval() # Added: , map_location=DEVICE
-    subset = PicoSAM2().to("cpu")
+    subset = PicoSAM2().to(DEVICE)
     subset.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1_subset.pt"), map_location=DEVICE)); subset.eval() # Added: , map_location=DEVICE
-    
-    # Rebuild QAT model
     qat_model = PicoSAM2().to(DEVICE)
-    qat_model.eval()
-
-    # ===== QAT: Fuse Conv+BN+ReLU layers =====
-    for name, module in qat_model.named_children():
-        if isinstance(module, nn.Sequential):
-            for idx in range(0, len(module), 3):
-                if idx + 2 < len(module):
-                    tq.fuse_modules(module, [str(idx), str(idx+1), str(idx+2)], inplace=True)
-
-    qat_model.train()
-
-    # ===== QAT: Prepare the model =====
-    qat_model.qconfig = tq.get_default_qat_qconfig('fbgemm')
-    tq.prepare_qat(qat_model, inplace=True)
-
-    # Load checkpoint
-    qat_model.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_QAT3_epoch1.pt"), map_location=DEVICE))
+    qat_model.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_QAT_epoch1.pt"), map_location=DEVICE)); qat_model.eval() # Added: , map_location=DEVICE
 
     def repr_dataset():
         val_iter = itertools.cycle(coco_loader)
@@ -136,23 +118,14 @@ if __name__ == "__main__":
         target_platform_capabilities=tpc
     )
 
-    # Evaluate
-    evaluate_picosam(qat_int8_model, coco_loader, "PicoSAM2 QAT & Quantized")
-
+    '''
     tpc = mct.get_target_platform_capabilities("pytorch", "imx500")
     quantized, _ = mct.ptq.pytorch_post_training_quantization(
         quant,
         representative_data_gen=repr_dataset(), 
         target_platform_capabilities=tpc
     )
-
-    #tpc = mct.get_target_platform_capabilities("pytorch", "imx500")
-    #quantized, _ = mct.ptq.pytorch_post_training_quantization(
-    #    qat_quantized,
-    #    representative_data_gen=repr_dataset(), 
-    #    target_platform_capabilities=tpc
-    #)
-
+    '''
 
     sam_variants = {
         "SAM2.1 Large": ("configs/sam2.1/sam2.1_hiera_l.yaml", "sam2.1_hiera_large.pt"),
@@ -167,7 +140,8 @@ if __name__ == "__main__":
     #evaluate_picosam(quantized, coco_loader, "PicoSAM2 Quantized (COCO)")
     #evaluate_picosam(subset, coco_loader, "PicoSAM2 Distilled Subset (COCO)")
     #evaluate_picosam(qat, coco_loader, "PicoSAM2 Distilled QAT (COCO)")
-    #evaluate_picosam(qat_quantized, coco_loader, "PicoSAM2 Distilled QAT & Quantized (COCO)")
+    evaluate_picosam(qat_model, coco_loader, "PicoSAM2 Distilled QAT (COCO)")
+    evaluate_picosam(qat_int8_model, coco_loader, "PicoSAM2 Distilled QAT & Quantized (COCO)")
     #evaluate_picosam(scratch, lvis_loader, "PicoSAM2 Trained (LVIS)")
     #evaluate_picosam(distilled, lvis_loader, "PicoSAM2 Distilled (LVIS)")
     #evaluate_picosam(quantized, lvis_loader, "PicoSAM2 Quantized (LVIS)")
