@@ -235,7 +235,7 @@ def train():
 
     # Dataset and loaders
     dataset = PicoSAM2Dataset(IMG_ROOT, ANN_FILE, IMAGE_SIZE)
-    subset_fraction = 0.03
+    subset_fraction = 0.01
     subset_size = int(len(dataset) * subset_fraction)
     val_size = max(1, int(subset_size * 0.1))
     train_size = subset_size - val_size
@@ -390,11 +390,11 @@ def train():
         torch.save(student_model.state_dict(), save_path)
     
     # ===== Convert to quantized model after training =====
-    student_model.eval()
-    quantized_model = tq.convert(student_model, inplace=False)
-    quant_path = os.path.join(OUTPUT_DIR, "PicoSAM2_student_quant.pt")
-    torch.save(quantized_model.state_dict(), quant_path)
-    print(f"Quantized model saved to {quant_path}")
+    #student_model.eval()
+    #quantized_model = tq.convert(student_model, inplace=False)
+    #quant_path = os.path.join(OUTPUT_DIR, "PicoSAM2_student_quant.pt")
+    #torch.save(quantized_model.state_dict(), quant_path)
+    #print(f"Quantized model saved to {quant_path}")
 
 
 

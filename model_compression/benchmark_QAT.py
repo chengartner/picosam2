@@ -103,6 +103,10 @@ if __name__ == "__main__":
     quant.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1.pt"), map_location=DEVICE)); quant.eval() # Added: , map_location=DEVICE
     subset = PicoSAM2().to("cpu")
     subset.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1_subset.pt"), map_location=DEVICE)); subset.eval() # Added: , map_location=DEVICE
+    qat = PicoSAM2().to("cpu")
+    qat.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_QAT_epoch1.pt"), map_location=DEVICE)); qat.eval() # Added: , map_location=DEVICE
+    qat_quantized = PicoSAM2().to("cpu")
+    qat_quantized.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_QAT_epoch1.pt"), map_location=DEVICE)); qat_quantized.eval() # Added: , map_location=DEVICE
 
     def repr_dataset():
         val_iter = itertools.cycle(coco_loader)
@@ -118,6 +122,13 @@ if __name__ == "__main__":
         target_platform_capabilities=tpc
     )
 
+    #tpc = mct.get_target_platform_capabilities("pytorch", "imx500")
+    #quantized, _ = mct.ptq.pytorch_post_training_quantization(
+    #    qat_quantized,
+    #    representative_data_gen=repr_dataset(), 
+    #    target_platform_capabilities=tpc
+    #)
+
 
     sam_variants = {
         "SAM2.1 Large": ("configs/sam2.1/sam2.1_hiera_l.yaml", "sam2.1_hiera_large.pt"),
@@ -129,8 +140,10 @@ if __name__ == "__main__":
 
     evaluate_picosam(scratch, coco_loader, "PicoSAM2 Trained (COCO)")
     evaluate_picosam(distilled, coco_loader, "PicoSAM2 Distilled (COCO)")
+    evaluate_picosam(quantized, coco_loader, "PicoSAM2 Quantized (COCO)")
     evaluate_picosam(subset, coco_loader, "PicoSAM2 Distilled Subset (COCO)")
-    #evaluate_picosam(quantized, coco_loader, "PicoSAM2 Quantized (COCO)")
+    evaluate_picosam(qat, coco_loader, "PicoSAM2 Distilled QAT (COCO)")
+    #evaluate_picosam(qat_quantized, coco_loader, "PicoSAM2 Distilled QAT & Quantized (COCO)")
     #evaluate_picosam(scratch, lvis_loader, "PicoSAM2 Trained (LVIS)")
     #evaluate_picosam(distilled, lvis_loader, "PicoSAM2 Distilled (LVIS)")
     #evaluate_picosam(quantized, lvis_loader, "PicoSAM2 Quantized (LVIS)")
