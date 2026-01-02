@@ -3,7 +3,7 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.quantization as tq
+import torch.ao.quantization as aoq
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split, Subset
 from torchvision import transforms
@@ -212,23 +212,7 @@ def train():
     teacher_predictor = SAM2ImagePredictor(teacher_model)
 
     # Student setup
-    student_model = PicoSAM2().to(device)
-
-    student_model.eval()
-
-    # ===== QAT: Fuse Conv+BN+ReLU layers =====
-    for name, module in student_model.named_children():
-        if isinstance(module, nn.Sequential):
-            for idx in range(0, len(module), 3):
-                if idx + 2 < len(module):
-                    tq.fuse_modules(module, [str(idx), str(idx+1), str(idx+2)], inplace=True)
-
-    student_model.train()
-
-    # ===== QAT: Prepare the model =====
-    student_model.qconfig = tq.get_default_qat_qconfig('fbgemm')
-    tq.prepare_qat(student_model, inplace=True)
-    print("Student model is QAT-ready.")
+    
 
     optimizer = torch.optim.AdamW(student_model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step: min(1.0, step / 1000))
@@ -248,6 +232,12 @@ def train():
     val_indices = indices[train_size:train_size + val_size]
     train_set = Subset(dataset, train_indices)
     val_set = Subset(dataset, val_indices)
+    student_model = PicoSAM2().to(device)
+
+    student_model.train()
+    qconfig = aoq.get_default_qat_qconfig('fbgemm')  # similar to old API
+    aoq.prepare_qat(student_model, qconfig=qconfig, inplace=True)
+    print("Student model is QAT-ready.")
     #train_set, val_set = random_split(dataset, [train_size, val_size])
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE)
@@ -391,7 +381,7 @@ def train():
     
     # ===== Convert to quantized model after training =====
     #student_model.eval()
-    #quantized_model = tq.convert(student_model, inplace=False)
+    #quantized_model = aoq.convert(student_model, inplace=False)
     #quant_path = os.path.join(OUTPUT_DIR, "PicoSAM2_student_quant.pt")
     #torch.save(quantized_model.state_dict(), quant_path)
     #print(f"Quantized model saved to {quant_path}")
