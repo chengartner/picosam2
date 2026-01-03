@@ -223,6 +223,8 @@ def train():
     val_size = max(1, int(subset_size * 0.1))
     train_size = subset_size - val_size
     # Randomly select indices
+    seed = 42
+    torch.manual_seed(seed)
     indices = torch.randperm(len(dataset))[:subset_size]
     # Split into train and validation
     train_indices = indices[:train_size]
@@ -230,14 +232,14 @@ def train():
     train_set = Subset(dataset, train_indices)
     val_set = Subset(dataset, val_indices)
 
+    # QAT preparation
     student_model.train()
-    qconfig = aoq.get_default_qat_qconfig('fbgemm')  # similar to old API
+    qconfig = aoq.get_default_qat_qconfig('fbgemm')
     aoq.prepare_qat(student_model, inplace=True)
     print("Student model is QAT-ready.")
-    #train_set, val_set = random_split(dataset, [train_size, val_size])
+
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE)
-
     vis_interval = max(1, len(train_loader) // 10)
 
     for epoch in range(NUM_EPOCHS):
@@ -374,13 +376,6 @@ def train():
         # ===== Save full-precision student model =====
         save_path = os.path.join(OUTPUT_DIR, f"PicoSAM2_student_QAT_epoch{epoch + 1}.pt")
         torch.save(student_model.state_dict(), save_path)
-    
-    # ===== Convert to quantized model after training =====
-    #student_model.eval()
-    #quantized_model = aoq.convert(student_model, inplace=False)
-    #quant_path = os.path.join(OUTPUT_DIR, "PicoSAM2_student_quant.pt")
-    #torch.save(quantized_model.state_dict(), quant_path)
-    #print(f"Quantized model saved to {quant_path}")
 
 
 
