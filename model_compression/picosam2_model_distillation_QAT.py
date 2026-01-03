@@ -218,12 +218,10 @@ def train():
 
     # Dataset and loaders
     dataset = PicoSAM2Dataset(IMG_ROOT, ANN_FILE, IMAGE_SIZE)
-    subset_fraction = 0.0005
+    subset_fraction = 0.0244
     subset_size = int(len(dataset) * subset_fraction)
     val_size = max(1, int(subset_size * 0.1))
     train_size = subset_size - val_size
-    #val_size = max(1, len(dataset) // 20)
-    #train_size = len(dataset) - val_size
     # Randomly select indices
     indices = torch.randperm(len(dataset))[:subset_size]
     # Split into train and validation
