@@ -21,8 +21,8 @@ NUM_EPOCHS = 1
 LEARNING_RATE = 3e-4
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IMG_ROOT = os.path.join(BASE_DIR, "../dataset/train2017")
-ANN_FILE = os.path.join(BASE_DIR, "../dataset/annotations/instances_train2017.json")
+IMG_ROOT = os.path.join(BASE_DIR, "../subset_COCO/train2017")
+ANN_FILE = os.path.join(BASE_DIR, "../subset_COCO/annotations/instances_filtered_train2017.json")
 CHECKPOINT_PATH = os.path.join(BASE_DIR, "../checkpoints/sam2.1_hiera_tiny.pt")
 CONFIG_PATH = "configs/sam2.1/sam2.1_hiera_t.yaml"
 OUTPUT_DIR = os.path.join(BASE_DIR, "../checkpoints")
