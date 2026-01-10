@@ -19,8 +19,8 @@ NUM_SAMPLES = 1000
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CKPT_DIR = os.path.join(BASE_DIR, "..", "checkpoints")
-COCO_IMG_ROOT = os.path.join(BASE_DIR, "..", "subset_COCO", "val2017")
-COCO_ANN_FILE = os.path.join(BASE_DIR, "..", "subset_COCO", "annotations", "instances_filtered_val2017.json")
+COCO_IMG_ROOT = os.path.join(BASE_DIR, "..", "dataset", "val2017")
+COCO_ANN_FILE = os.path.join(BASE_DIR, "..", "dataset", "annotations", "instances_val2017.json")
 
 def unnormalize(tensor):
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3,1,1)
@@ -93,16 +93,14 @@ if __name__ == "__main__":
     coco_data = PicoSAM2Dataset(COCO_IMG_ROOT, COCO_ANN_FILE, image_size=IMAGE_SIZE)
     coco_loader = DataLoader(coco_data, batch_size=1, shuffle=False)
 
-    scratch = PicoSAM2().to(DEVICE)
-    scratch.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_epoch1.pt"), map_location=DEVICE)); scratch.eval() # Added: , map_location=DEVICE
-    distilled = PicoSAM2().to(DEVICE)
-    distilled.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1.pt"), map_location=DEVICE)); distilled.eval() # Added: , map_location=DEVICE
-    quant = PicoSAM2().to("cpu")
-    quant.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1.pt"), map_location=DEVICE)); quant.eval() # Added: , map_location=DEVICE
     subset = PicoSAM2().to(DEVICE)
     subset.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1_subset.pt"), map_location=DEVICE)); subset.eval() # Added: , map_location=DEVICE
+    quant = PicoSAM2().to("cpu")
+    quant.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_epoch1_subset.pt"), map_location=DEVICE)); quant.eval() # Added: , map_location=DEVICE
     qat_model = PicoSAM2().to(DEVICE)
     qat_model.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_QAT_epoch1.pt"), map_location=DEVICE)); qat_model.eval() # Added: , map_location=DEVICE
+    qat_quant = PicoSAM2().to(DEVICE)
+    qat_quant.load_state_dict(torch.load(os.path.join(CKPT_DIR, "PicoSAM2_student_QAT_epoch1.pt"), map_location=DEVICE)); qat_quant.eval() # Added: , map_location=DEVICE
 
     def repr_dataset():
         val_iter = itertools.cycle(coco_loader)
@@ -112,42 +110,22 @@ if __name__ == "__main__":
         return generator
 
     tpc = mct.get_target_platform_capabilities("pytorch", "imx500")
-    qat_int8_model, _ = mct.ptq.pytorch_post_training_quantization(
-        qat_model,
+    qat_quant, _ = mct.ptq.pytorch_post_training_quantization(
+        qat_quant,
         representative_data_gen=repr_dataset(),
         target_platform_capabilities=tpc
     )
 
-    '''
-    tpc = mct.get_target_platform_capabilities("pytorch", "imx500")
     quantized, _ = mct.ptq.pytorch_post_training_quantization(
         quant,
         representative_data_gen=repr_dataset(), 
         target_platform_capabilities=tpc
     )
-    '''
 
-    sam_variants = {
-        "SAM2.1 Large": ("configs/sam2.1/sam2.1_hiera_l.yaml", "sam2.1_hiera_large.pt"),
-        "SAM2.1 Base+": ("configs/sam2.1/sam2.1_hiera_b+.yaml", "sam2.1_hiera_base_plus.pt"),
-        "SAM2.1 Small": ("configs/sam2.1/sam2.1_hiera_s.yaml", "sam2.1_hiera_small.pt"),
-        "SAM2.1 Tiny":  ("configs/sam2.1/sam2.1_hiera_t.yaml", "sam2.1_hiera_tiny.pt")
-    }
-    sam_predictors = {name: SAM2ImagePredictor(build_sam2(cfg, os.path.join(CKPT_DIR, ckpt), device=DEVICE, mode="eval")) for name, (cfg, ckpt) in sam_variants.items()}
 
-    #evaluate_picosam(scratch, coco_loader, "PicoSAM2 Trained (COCO)")
-    #evaluate_picosam(distilled, coco_loader, "PicoSAM2 Distilled (COCO)")
-    #evaluate_picosam(quantized, coco_loader, "PicoSAM2 Quantized (COCO)")
-    #evaluate_picosam(subset, coco_loader, "PicoSAM2 Distilled Subset (COCO)")
-    #evaluate_picosam(qat, coco_loader, "PicoSAM2 Distilled QAT (COCO)")
+    evaluate_picosam(subset, coco_loader, "PicoSAM2 Distilled Subset (COCO)")
+    evaluate_picosam(quantized, coco_loader, "PicoSAM2 Quantized Subset (COCO)")
     evaluate_picosam(qat_model, coco_loader, "PicoSAM2 Distilled QAT (COCO)")
-    evaluate_picosam(qat_int8_model, coco_loader, "PicoSAM2 Distilled QAT & Quantized (COCO)")
-    #evaluate_picosam(scratch, lvis_loader, "PicoSAM2 Trained (LVIS)")
-    #evaluate_picosam(distilled, lvis_loader, "PicoSAM2 Distilled (LVIS)")
-    #evaluate_picosam(quantized, lvis_loader, "PicoSAM2 Quantized (LVIS)")
-
-    for name, predictor in sam_predictors.items():
-        evaluate_sam2(predictor, coco_data, f"{name} (COCO)")
-        evaluate_sam2(predictor, lvis_data, f"{name} (LVIS)")
+    evaluate_picosam(qat_quant, coco_loader, "PicoSAM2 Distilled QAT & Quantized (COCO)")
 
 
